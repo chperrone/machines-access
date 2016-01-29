@@ -1,33 +1,30 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
-
 #include <SPI.h>
 #include <MFRC522.h>
 
-#define RST_PIN         5          // Configurable, see typical pin layout above
-#define SS_PIN          4         // Configurable, see typical pin layout above
+#define RST_PIN         5
+#define SS_PIN          4
+#define SWITCH_PIN      0       
 
-MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance
-
-// WiFi information
+//Wifi credentials
 const char* WIFI_SSID = "Artisan's Asylum";
 const char* WIFI_PSK = "I won't download stuff that will get us in legal trouble.";
 
 // Remote site information
-//const char* http_site = "www.adafruit.com";
 const char* ip = "172.16.11.27";
 const int http_port = 8080;
 
-// Pin definitions
-const int LED_PIN = 5;
 
-// Global variables
+
+// class Instances
 WiFiClient client;
+MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance
 
 void flash() {
-  digitalWrite(0, HIGH);
+  digitalWrite(SWITCH_PIN, HIGH);
   delay(1000);
-  digitalWrite(0, LOW);
+  digitalWrite(SWITCH_PIN, LOW);
   delay(1000);
 }
 
@@ -42,7 +39,6 @@ void dump_byte_array(byte *buffer, byte bufferSize) {
 
 // Perform an HTTP GET request to a remote page
 bool getPage() {
-
   delay(500);
   
   // Attempt to make a connection to the remote server
