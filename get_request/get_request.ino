@@ -47,7 +47,6 @@ bool getPage() {
   
   // Attempt to make a connection to the remote server
   if ( !client.connect(ip, http_port) ) {
-    Serial.println("Could connect to remote server");
     return false;
   }
 
@@ -63,8 +62,11 @@ bool getPage() {
   client.print(String("GET ") + url + " HTTP/1.1\r\n" +
                "Host: " + ip + "\r\n" + 
                "Connection: close\r\n\r\n");
-  
-  return true;
+
+  if (client.find(true)) {
+    return true;
+  } 
+  else { return false; }
 }
 // Attempt to connect to WiFi
 void connectWiFi() {
@@ -126,8 +128,6 @@ void loop() {
   if ( !getPage() ) {
     Serial.println("GET request failed");
   }
-
-  Serial.println("the card is good!");
   
   flash();
     
