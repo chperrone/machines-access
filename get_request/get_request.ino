@@ -1,7 +1,8 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <SPI.h>
-#include <MFRC522.h>
+#include <MFRC522.h> // card reader library
+#include <aJSON.h>
 
 #define RST_PIN         5
 #define SS_PIN          4
@@ -12,7 +13,7 @@ const char* WIFI_SSID = "Artisan's Asylum";
 const char* WIFI_PSK = "I won't download stuff that will get us in legal trouble.";
 
 // Remote site information
-const char* ip = "172.16.11.27";
+const char* ip = "172.16.10.143";
 const int http_port = 8080;
 
 
@@ -53,16 +54,29 @@ bool getPage() {
   String url = "/api";
   Serial.print("Requesting URL: ");
   Serial.println(url);
-  
+
   // This will send the request to the server
   client.print(String("GET ") + url + " HTTP/1.1\r\n" +
                "Host: " + ip + "\r\n" + 
                "Connection: close\r\n\r\n");
 
-  if (client.find(true)) {
-    return true;
-  } 
-  else { return false; }
+  int timeout = millis() + 5000;
+  while (client.available() == 0) {
+    if (timeout - millis() < 0) {
+      Serial.println(">>> Client Timeout !");
+      client.stop();
+      return false;
+    }
+  }
+  while(client.available()) {
+    String line = client.readStringUntil('\r');
+    Serial.println(line);
+    //aJsonObject* root = aJson.parse(line);
+    //aJsonObject* x = aJson.getObjectItem(root, "message");
+    //Serial.println(x->valuestring);
+  }
+
+  return true;
 }
 // Attempt to connect to WiFi
 void connectWiFi() {
@@ -124,7 +138,7 @@ void loop() {
   if ( !getPage() ) {
     Serial.println("GET request failed");
   }
-  
+
   flash();
     
   // Close socket
