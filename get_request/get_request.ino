@@ -42,7 +42,7 @@ void dump_byte_array(byte *buffer, byte bufferSize) {
 
 
 // Perform an HTTP GET request to a remote page
-bool getPage(byte *card) {
+bool getPage(String card) {
   delay(500);
 
   // Attempt to make a connection to the remote server
@@ -54,7 +54,7 @@ bool getPage(byte *card) {
   Serial.println("Making Get Request...");
 
   // We now create a URI for the request
-  String url = "/api";
+  String url = "/api/get/" + card;
   Serial.print("Requesting URL: ");
   Serial.println(url);
 
@@ -145,7 +145,7 @@ void loop() {
   String card;
 
   for (byte i = 0; i < sizeof(card_number); i++) {
-    String x = String(card_number[i] < 0x10 ? " 0" : " ");
+    String x = String(card_number[i] < 0x10 ? "0" : "");
     String y = String(card_number[i], HEX);
 
     x.concat(y);
@@ -156,7 +156,7 @@ void loop() {
 
 
   // Attempt to connect to website
-  if ( !getPage(card_number) ) {
+  if ( !getPage(card) ) {
     Serial.println("GET request failed");
   }
 
