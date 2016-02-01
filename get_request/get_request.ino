@@ -6,7 +6,7 @@
 
 #define RST_PIN         5
 #define SS_PIN          4
-#define SWITCH_PIN      0       
+#define SWITCH_PIN      0
 
 //Wifi credentials
 const char* WIFI_SSID = "Artisan's Asylum";
@@ -36,12 +36,15 @@ void dump_byte_array(byte *buffer, byte bufferSize) {
     Serial.print(buffer[i] < 0x10 ? " 0" : " ");
     Serial.print(buffer[i], HEX);
   }
+
+  
 }
 
+
 // Perform an HTTP GET request to a remote page
-bool getPage() {
+bool getPage(byte *card) {
   delay(500);
-  
+
   // Attempt to make a connection to the remote server
   if ( !client.connect(ip, http_port) ) {
     return false;
@@ -49,7 +52,7 @@ bool getPage() {
 
   Serial.println();
   Serial.println("Making Get Request...");
-  
+
   // We now create a URI for the request
   String url = "/api";
   Serial.print("Requesting URL: ");
@@ -57,7 +60,7 @@ bool getPage() {
 
   // This will send the request to the server
   client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + ip + "\r\n" + 
+               "Host: " + ip + "\r\n" +
                "Connection: close\r\n\r\n");
 
   int timeout = millis() + 5000;
@@ -68,7 +71,7 @@ bool getPage() {
       return false;
     }
   }
-  while(client.available()) {
+  while (client.available()) {
     String line = client.readStringUntil('\r');
     Serial.println(line);
     //aJsonObject* root = aJson.parse(line);
@@ -82,25 +85,25 @@ bool getPage() {
 void connectWiFi() {
 
   Serial.println("Attempting to connect to WiFi");
-  
+
   // Initiate connection with SSID and PSK
   WiFi.begin(WIFI_SSID, WIFI_PSK);
-  
+
   // Blink LED while we wait for WiFi connection
   while ( WiFi.status() != WL_CONNECTED ) {
     Serial.println(".");
     delay(500);
   }
-  
+
   Serial.println("WiFi Connected!!");
 }
 
 void setup() {
-  
+
   // Set up serial console to read web page
   Serial.begin(115200);
   Serial.print("Prototype");
-  
+
   // Set up pin 0 for the relay switch
   //pinMode(0, OUTPUT);
   pinMode(RST_PIN, LOW); //Tricky little bit, the pin gets pulled up by the card reader
@@ -108,12 +111,12 @@ void setup() {
   connectWiFi();
 
   delay(500);
-  
+
   SPI.begin();      // Init SPI bus
   mfrc522.PCD_Init();   // Init MFRC522
-  
+
   delay(1000);
-  
+
 }
 
 void loop() {
@@ -131,16 +134,34 @@ void loop() {
 
   // Show some details of the PICC (that is: the tag/card)
   Serial.print(F("Card UID:"));
-  dump_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size);
-  Serial.println();
-  
+  //dump_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size);
+
+  byte card_number[4];
+
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    card_number[i] = mfrc522.uid.uidByte[i];
+  }
+
+  String card;
+
+  for (byte i = 0; i < sizeof(card_number); i++) {
+    String x = String(card_number[i] < 0x10 ? " 0" : " ");
+    String y = String(card_number[i], HEX);
+
+    x.concat(y);
+    card.concat(x);
+  }
+
+  Serial.println(card);
+
+
   // Attempt to connect to website
-  if ( !getPage() ) {
+  if ( !getPage(card_number) ) {
     Serial.println("GET request failed");
   }
 
   flash();
-    
+
   // Close socket
   client.stop();
 }
