@@ -1,8 +1,8 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <SPI.h>
-#include <MFRC522.h> // card reader library
-#include <aJSON.h>
+#include <MFRC522.h> // card reader library-
+#include <TextFinder.h>
 
 #define RST_PIN         5
 #define SS_PIN          4
@@ -16,10 +16,11 @@ const char* WIFI_PSK = "I won't download stuff that will get us in legal trouble
 const char* ip = "172.16.10.143";
 const int http_port = 8080;
 
-
-
 // class Instances
 WiFiClient client;
+TextFinder finder( client );
+
+//RestClient client = RestClient(ip,http_port);
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance
 
 void flash() {
@@ -36,24 +37,18 @@ void dump_byte_array(byte *buffer, byte bufferSize) {
     Serial.print(buffer[i] < 0x10 ? " 0" : " ");
     Serial.print(buffer[i], HEX);
   }
-
-  
 }
 
 
 // Perform an HTTP GET request to a remote page
 bool getPage(String card) {
-  delay(500);
-
   // Attempt to make a connection to the remote server
   if ( !client.connect(ip, http_port) ) {
     return false;
   }
-
-  Serial.println();
+  
   Serial.println("Making Get Request...");
-
-  // We now create a URI for the request
+  // create a URL
   String url = "/api/get/" + card;
   Serial.print("Requesting URL: ");
   Serial.println(url);
@@ -71,12 +66,21 @@ bool getPage(String card) {
       return false;
     }
   }
+  
   while (client.available()) {
-    String line = client.readStringUntil('\r');
-    Serial.println(line);
-    //aJsonObject* root = aJson.parse(line);
-    //aJsonObject* x = aJson.getObjectItem(root, "message");
-    //Serial.println(x->valuestring);
+    delay(10);
+    if (finder.findUntil( "200", "\n")) {
+      Serial.println("HTTP Code 200");
+      return true;
+    }
+    else if (finder.findUntil( "300", "\n")) {
+      Serial.println("HTTP Code 300");
+      return true;
+    }
+    else if (finder.findUntil( "400", "\n")) {
+      Serial.println("HTTP Code 400");
+      return true;
+    } else { Serial.println("Could not find an http status code"); } 
   }
 
   return true;
@@ -102,7 +106,7 @@ void setup() {
 
   // Set up serial console to read web page
   Serial.begin(115200);
-  Serial.print("Prototype");
+  Serial.print("Prototype ");
 
   // Set up pin 0 for the relay switch
   //pinMode(0, OUTPUT);
@@ -153,6 +157,7 @@ void loop() {
   }
 
   Serial.println(card);
+  delay(10);
 
 
   // Attempt to connect to website
