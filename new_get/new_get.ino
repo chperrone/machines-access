@@ -16,7 +16,7 @@ const char* WIFI_PSK = "I won't download stuff that will get us in legal trouble
 const char* ip = "172.16.11.67";
 const int http_port = 8080;
 
-const int array_size = 500;
+const int array_size = 10;
 String card_array[array_size];
 
 // class Instances
@@ -148,13 +148,10 @@ void connectToWifi() {
  */
 bool canAccess(String card) {
   for (int i=0; i < sizeof(card_array); i++) {
-    if (!card_array[i].equals("")) {
-      if (card_array[i].equals(card)) {
-        return true;
-      } 
-      
-    } else {
+    if (card_array[i].equals("")) {
       return false;
+    } else if (card_array[i].equals(card)) {
+      return true;
     }
   }
   
