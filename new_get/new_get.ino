@@ -5,6 +5,7 @@
 #include <TextFinder.h>
 #include <TimeLib.h>
 #include <WiFiUDP.h>
+#include <EEPROM.h>
 
 #define RST_PIN         5
 #define SS_PIN          4
@@ -17,42 +18,39 @@
 //Wifi credentials
 const char* WIFI_SSID = "Artisan's Asylum";
 const char* WIFI_PSK = "I won't download stuff that will get us in legal trouble.";
-// Remote site information
-const char* ip = "172.16.11.34";
+//Remote site information
+const char* ip = "172.16.10.240";
 const int http_port = 8080;
-
 const int array_size = 10;
 String card_array[array_size];
 String led_color;
 const int timeZone = -5;  // Eastern Standard Time (USA)
-
-IPAddress timeServer(132, 163, 4, 102); // time-a.timefreq.bldrdoc.gov
+const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
+byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
 // class Instances
 WiFiUDP Udp;
 WiFiClient client;
 TextFinder finder( client );
 MFRC522 mfrc522(SS_PIN, RST_PIN);
+IPAddress timeServer(132, 163, 4, 102); // time-a.timefreq.bldrdoc.gov
 
 /*
  * Supply power to the machine. In other words,
  * send a logic signal from the designated pin.
  */
-void power() {
+void power_on() {
   digitalWrite(SWITCH_PIN, HIGH);
-  delay(1000);
+}
+
+void power_off() {
   digitalWrite(SWITCH_PIN, LOW);
-  delay(1000);
 }
 
 /////////////////////////////////////////////
 
-const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
-byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
-
 // send an NTP request to the time server at the given address
-void sendNTPpacket(IPAddress &address)
-{
+void sendNTPpacket(IPAddress &address) {
   // set all bytes in the buffer to 0
   memset(packetBuffer, 0, NTP_PACKET_SIZE);
   // Initialize values needed to form NTP request
@@ -73,8 +71,7 @@ void sendNTPpacket(IPAddress &address)
   Udp.endPacket();
 }
 
-time_t getNtpTime()
-{
+time_t getNtpTime() {
   while (Udp.parsePacket() > 0) ; // discard any previously received packets
   Serial.println("Transmiting NTP Request...");
   sendNTPpacket(timeServer);
@@ -96,7 +93,6 @@ time_t getNtpTime()
   Serial.println("No NTP Response :-(");
   return 0; // return 0 if unable to get the time
 }
-
 
 /////////////////////////////////////////////
 ///////// LED COLORS
@@ -158,7 +154,6 @@ void updateColor() {
 
 //////////////////////////////////////////////////////
 ////////// DATA MGMT
-//////////////////////////////////////////////////////
 
 /*
  * Print the locally stored list of approved cards
@@ -220,7 +215,6 @@ void buildList(WiFiClient myClient) {
 
 ////////////////////////////////////////////////////////////
 ////////// NETWORKING 
-////////////////////////////////////////////////////////////
 
 // Perform an HTTP GET request for a static csv file
 bool getFile() {
@@ -229,7 +223,7 @@ bool getFile() {
     return false;
   }
   
-  Serial.println("Making Get Request...");
+  Serial.println("Making List Request...");
   
   // create a URL
   String url = "/woodshop.csv";
@@ -256,6 +250,39 @@ bool getFile() {
   return true;
 }
 
+bool sendMaintenanceRequest() {
+   // Attempt to make a connection to the remote server
+  if ( !client.connect(ip, http_port) ) {
+    return false;
+  }
+
+  Serial.println("Making Maintenance Request...");
+
+  // create a URL
+  String url = "/maintenance";
+  String body = "THE LATHE IS BROKEN";
+  
+  Serial.print("Requesting URL: ");
+  Serial.println(url);
+  // This will send the request to the server
+  client.print(String("GET ") + url + body + " HTTP/1.1\r\n" +
+               "Host: " + ip + "\r\n" +
+               "Connection: close\r\n\r\n");
+
+  int timeout = millis() + 5000;
+  while (client.available() == 0) {
+    if (timeout - millis() < 0) {
+      Serial.println(">>> Client Timeout !");
+      client.stop();
+      return false;
+    }
+  }
+
+  Serial.println("Maintenance Request Succesful");
+  client.stop();
+  return true;
+}
+
 void connectToWifi() {
   Serial.println("Attempting to connect to WiFi");
   // Initiate connection with SSID and PSK
@@ -263,7 +290,7 @@ void connectToWifi() {
   
   // Blink LED while we wait for WiFi connection
   while ( WiFi.status() != WL_CONNECTED ) {
-    Serial.println(".");
+    Serial.print(".");
     delay(500);
   }
   Serial.println("WiFi Connected!!");
@@ -304,7 +331,6 @@ bool logUsage(String card) {
 //////////////////////////////////////////////////
 
 void updateButtonHandler() {
-  Serial.println("update ping");
   makeGreen();
   if ( !getFile() ) {
     Serial.println("Error: could not access server, could not update list");
@@ -313,7 +339,10 @@ void updateButtonHandler() {
 }
 
 void maintenanceButtonHandler() {
-  Serial.println("maintenance ping");
+  makeGreen();
+  if (! sendMaintenanceRequest() ) {
+    Serial.println("Error: could not send a maintenance Request");
+  }
   delay(5000);
 }
 
@@ -338,7 +367,6 @@ void setup() {
   
   // Set up serial console to read web page
   Serial.begin(115200);
-  Serial.print("Prototype ");
 
   // Set up pin 0 for the relay switch
   pinMode(SWITCH_PIN, OUTPUT);
@@ -414,12 +442,13 @@ void loop() {
   // Attempt to 
   if ( ! canAccess(card) ) {
     Serial.println("MEMBER NOT AUTHORIZED: machine will NOT turn on.\n");
+    power_off();
     makeRed(1000);
     return;
   }
 
   Serial.println("MEMBER AUTHORIZED: machine powering up.\n");
   makeGreen(1000);
-  power();
+  power_on();
   logUsage(card);
 }
